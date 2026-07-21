@@ -27,6 +27,14 @@ app.use("/api/comments", commentsRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/uploads", uploadsRouter);
+// Temporary compatibility aliases for clients opened before the /api prefix rollout.
+app.use("/auth", authRouter);
+app.use("/projects", projectsRouter);
+app.use("/tasks", tasksRouter);
+app.use("/comments", commentsRouter);
+app.use("/dashboard", dashboardRouter);
+app.use("/notifications", notificationsRouter);
+app.use("/uploads", uploadsRouter);
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof ZodError) return res.status(400).json({ error: "Validation failed", issues: error.issues });
