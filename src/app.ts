@@ -1,0 +1,36 @@
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { ZodError } from "zod";
+import { env } from "./config/env.js";
+import { authRouter } from "./routes/auth.js";
+import { projectsRouter } from "./routes/projects.js";
+import { tasksRouter } from "./routes/tasks.js";
+import { commentsRouter } from "./routes/comments.js";
+import { dashboardRouter } from "./routes/dashboard.js";
+import { notificationsRouter } from "./routes/notifications.js";
+import { uploadsRouter } from "./routes/uploads.js";
+
+export const app = express();
+app.set("trust proxy", 1);
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
+app.use(rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: "draft-8" }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true }));
+app.get("/health", (_req, res) => res.json({ ok: true, service: "orbit-api", timestamp: new Date().toISOString() }));
+app.use("/api/auth", authRouter);
+app.use("/api/projects", projectsRouter);
+app.use("/api/tasks", tasksRouter);
+app.use("/api/comments", commentsRouter);
+app.use("/api/dashboard", dashboardRouter);
+app.use("/api/notifications", notificationsRouter);
+app.use("/api/uploads", uploadsRouter);
+app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
+app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (error instanceof ZodError) return res.status(400).json({ error: "Validation failed", issues: error.issues });
+  const typed = error as { status?: number; message?: string };
+  console.error(error);
+  return res.status(typed.status || 500).json({ error: typed.status ? typed.message : "Internal server error" });
+});

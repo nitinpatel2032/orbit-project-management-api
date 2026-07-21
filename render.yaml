@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: orbit-project-management-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build && npx prisma db push
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://orbit-project-management.nitin-patel-maxworth.chatgpt.site
+      - key: UPLOAD_DIR
+        value: /tmp/orbit-uploads
