@@ -10,7 +10,7 @@ import type { AuthRequest } from "../types.js";
 export const projectsRouter = Router();
 projectsRouter.use(requireAuth);
 
-const memberInclude = { where: { leftAt: null }, include: { user: { select: { id: true, email: true, username: true, displayName: true, avatarUrl: true } } } } } as const;
+const memberInclude = { where: { leftAt: null }, include: { user: { select: { id: true, email: true, username: true, displayName: true, avatarUrl: true } } } } as const;
 const canManage = (role: string) => role === "OWNER" || role === "ADMIN";
 
 projectsRouter.get("/", async (req: AuthRequest, res) => {
