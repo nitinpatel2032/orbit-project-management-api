@@ -24,3 +24,16 @@ authRouter.post("/login", async (req, res) => {
   res.json({ token: signToken(identity), user: identity });
 });
 authRouter.get("/me", requireAuth, (req: AuthRequest, res) => res.json({ user: req.user }));
+
+const profileSchema = z.object({
+  username: z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9._-]+$/, "Use letters, numbers, dots, underscores, or hyphens"),
+});
+authRouter.patch("/profile", requireAuth, async (req: AuthRequest, res) => {
+  const input = profileSchema.parse(req.body);
+  const username = input.username.toLowerCase();
+  const exists = await prisma.user.findFirst({ where: { username, id: { not: req.user!.id } }, select: { id: true } });
+  if (exists) return res.status(409).json({ error: "Username is already taken" });
+  const user = await prisma.user.update({ where: { id: req.user!.id }, data: { username } });
+  const identity = { id: user.id, email: user.email, username: user.username, displayName: user.displayName };
+  res.json({ token: signToken(identity), user: identity });
+});
