@@ -40,7 +40,8 @@ uploadsRouter.get("/:attachmentId/view", async (req: AuthRequest, res) => {
   res.sendFile(path.resolve(env.UPLOAD_DIR, attachment.storageKey));
 });
 uploadsRouter.delete("/:attachmentId", async (req: AuthRequest, res) => {
-  const attachment = await prisma.attachment.findUniqueOrThrow({ where: { id: String(req.params.attachmentId) } });
+  const attachment = await prisma.attachment.findUnique({ where: { id: String(req.params.attachmentId) } });
+  if (!attachment) return res.status(404).json({ error: "Attachment not found" });
   const member = await requireProjectMember(attachment.projectId, req.user!.id);
   if (attachment.uploadedById !== req.user!.id && member.role !== "OWNER") return res.status(403).json({ error: "Only the uploader or project owner can delete this file" });
   await prisma.attachment.delete({ where: { id: attachment.id } });
