@@ -265,3 +265,85 @@ model CommentReaction {
   @@id([commentId, userId, emoji])
   @@index([commentId])
 }
+
+
+model TaskTemplate {
+  id String @id @default(cuid())
+  projectId String
+  name String
+  title String
+  description String @default("")
+  priority Priority @default(MEDIUM)
+  recurrence String?
+  nextRunAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([projectId])
+}
+
+model ProjectField {
+  id String @id @default(cuid())
+  projectId String
+  name String
+  type String
+  options String[] @default([])
+  createdAt DateTime @default(now())
+  @@unique([projectId, name])
+}
+
+model TaskCustomValue {
+  id String @id @default(cuid())
+  taskId String
+  fieldId String
+  value Json
+  @@unique([taskId, fieldId])
+}
+
+model TimeEntry {
+  id String @id @default(cuid())
+  projectId String
+  taskId String
+  userId String
+  note String @default("")
+  startedAt DateTime @default(now())
+  endedAt DateTime?
+  minutes Int?
+  @@index([projectId, userId, startedAt])
+}
+
+model Milestone {
+  id String @id @default(cuid())
+  projectId String
+  name String
+  dueDate DateTime
+  status String @default("OPEN")
+  createdAt DateTime @default(now())
+  @@index([projectId, dueDate])
+}
+
+model MilestoneTask {
+  milestoneId String
+  taskId String
+  @@id([milestoneId, taskId])
+}
+
+model NotificationPreference {
+  userId String @id
+  email Boolean @default(true)
+  inApp Boolean @default(true)
+  assigned Boolean @default(true)
+  comments Boolean @default(true)
+  mentions Boolean @default(true)
+  digest Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model SavedFilter {
+  id String @id @default(cuid())
+  projectId String
+  userId String
+  name String
+  filters Json
+  createdAt DateTime @default(now())
+  @@index([projectId, userId])
+}
