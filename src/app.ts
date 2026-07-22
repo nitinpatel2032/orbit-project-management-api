@@ -11,6 +11,7 @@ import { commentsRouter } from "./routes/comments.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { notificationsRouter } from "./routes/notifications.js";
 import { uploadsRouter } from "./routes/uploads.js";
+import { productivityRouter } from "./routes/productivity.js";
 
 export const app = express();
 app.set("trust proxy", 1);
@@ -27,6 +28,7 @@ app.use("/api/comments", commentsRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/uploads", uploadsRouter);
+app.use("/api/productivity", productivityRouter);
 // Temporary compatibility aliases for clients opened before the /api prefix rollout.
 app.use("/auth", authRouter);
 app.use("/projects", projectsRouter);
