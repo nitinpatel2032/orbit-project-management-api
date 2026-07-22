@@ -47,12 +47,13 @@ const hydrateTaskKeys = async (projectId: string, projectKey: string) => {
   const missing = existing.filter(task => task.number === null || task.key === null);
   if (missing.length) {
     let next = Math.max(0, ...existing.map(task => task.number || 0)) + 1;
-    const updates = missing.map(task => {
-      const number = next++;
-      return prisma.task.update({ where: { id: task.id }, data: { number, key: `${projectKey}-${encodeTaskNumber(number)}` } });
+    await prisma.$transaction(async tx => {
+      for (const task of missing) {
+        const number = next++;
+        await tx.task.update({ where: { id: task.id }, data: { number, key: `${projectKey}-${encodeTaskNumber(number)}` } });
+      }
+      await tx.project.update({ where: { id: projectId }, data: { nextTaskNumber: next } });
     });
-    updates.push(prisma.project.update({ where: { id: projectId }, data: { nextTaskNumber: next } }) as never);
-    await prisma.$transaction(updates);
   }
   return prisma.task.findMany({
     where: { projectId, deletedAt: null },
