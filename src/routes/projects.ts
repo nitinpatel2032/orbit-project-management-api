@@ -1,4 +1,5 @@
-import { Router } from "express";\nimport { randomBytes } from "node:crypto";
+import { Router } from "express";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -38,7 +39,8 @@ projectsRouter.get("/", async (req: AuthRequest, res) => {
 
 projectsRouter.post("/", async (req: AuthRequest, res) => {
   const input = z.object({ name: z.string().min(2).max(100), description: z.string().max(1000).default(""), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#5B5CE2"), privacy: z.enum(["PRIVATE", "PUBLIC"]).default("PRIVATE") }).parse(req.body);
-  const key = await nextProjectKey();\n  const project = await prisma.project.create({ data: { ...input, key, members: { create: { userId: req.user!.id, role: "OWNER" } } }, include: { members: memberInclude } });
+  const key = await nextProjectKey();
+  const project = await prisma.project.create({ data: { ...input, key, members: { create: { userId: req.user!.id, role: "OWNER" } } }, include: { members: memberInclude } });
   await logActivity({ projectId: project.id, userId: req.user!.id, action: "PROJECT_CREATED", newValue: { name: project.name } });
   req.app.get("io").to(`user:${req.user!.id}`).emit("project:created", project);
   res.status(201).json({ project });
