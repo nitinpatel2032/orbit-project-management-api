@@ -66,6 +66,8 @@ model User {
 
 model Project {
   id String @id @default(cuid())
+  key String? @unique
+  nextTaskNumber Int @default(1)
   name String
   description String @default("")
   color String @default("#5B5CE2")
@@ -96,6 +98,8 @@ model ProjectMember {
 
 model Task {
   id String @id @default(cuid())
+  key String? @unique
+  number Int?
   projectId String
   parentId String?
   title String
