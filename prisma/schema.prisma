@@ -123,6 +123,7 @@ model Task {
   attachments Attachment[]
   labels TaskLabel[]
   tags TaskTag[]
+  @@unique([projectId, number])
   @@index([projectId, parentId, position])
   @@index([assigneeId, status])
 }
