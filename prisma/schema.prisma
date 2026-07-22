@@ -165,6 +165,7 @@ model Attachment {
   storageKey String
   mimeType String
   size Int
+  tags String[] @default([])
   createdAt DateTime @default(now())
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
