@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router } from "express";\nimport { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -12,6 +12,20 @@ projectsRouter.use(requireAuth);
 
 const memberInclude = { where: { leftAt: null }, include: { user: { select: { id: true, email: true, username: true, displayName: true, avatarUrl: true } } } } as const;
 const canManage = (role: string) => role === "OWNER" || role === "ADMIN";
+const projectKeyCandidate = () => `ORB-${randomBytes(5).toString("base64url").replace(/[^A-Z0-9]/gi, "").slice(0, 6).toUpperCase().padEnd(6, "0")}`;
+const nextProjectKey = async () => {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const key = projectKeyCandidate();
+    if (!await prisma.project.findUnique({ where: { key }, select: { id: true } })) return key;
+  }
+  throw new Error("Could not allocate a project key");
+};
+const withProjectKey = async <T extends { id: string; key: string | null }>(project: T): Promise<T & { key: string }> => {
+  if (project.key) return project as T & { key: string };
+  const key = await nextProjectKey();
+  await prisma.project.update({ where: { id: project.id }, data: { key } });
+  return { ...project, key };
+};
 
 projectsRouter.get("/", async (req: AuthRequest, res) => {
   const projects = await prisma.project.findMany({
@@ -19,12 +33,12 @@ projectsRouter.get("/", async (req: AuthRequest, res) => {
     include: { members: memberInclude, _count: { select: { tasks: true } } },
     orderBy: { updatedAt: "desc" },
   });
-  res.json({ projects });
+  res.json({ projects: await Promise.all(projects.map(withProjectKey)) });
 });
 
 projectsRouter.post("/", async (req: AuthRequest, res) => {
   const input = z.object({ name: z.string().min(2).max(100), description: z.string().max(1000).default(""), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#5B5CE2"), privacy: z.enum(["PRIVATE", "PUBLIC"]).default("PRIVATE") }).parse(req.body);
-  const project = await prisma.project.create({ data: { ...input, members: { create: { userId: req.user!.id, role: "OWNER" } } }, include: { members: memberInclude } });
+  const key = await nextProjectKey();\n  const project = await prisma.project.create({ data: { ...input, key, members: { create: { userId: req.user!.id, role: "OWNER" } } }, include: { members: memberInclude } });
   await logActivity({ projectId: project.id, userId: req.user!.id, action: "PROJECT_CREATED", newValue: { name: project.name } });
   req.app.get("io").to(`user:${req.user!.id}`).emit("project:created", project);
   res.status(201).json({ project });
