@@ -57,14 +57,14 @@ projectsRouter.post("/join", async (req: AuthRequest, res) => {
   });
   await logActivity({ projectId: project.id, userId: req.user!.id, action: "MEMBER_JOINED" });
   req.app.get("io").to(`project:${project.id}`).emit("member:joined", { userId: req.user!.id });
-  res.json({ project, membership });
+  res.json({ project: project ? await withProjectKey(project) : project, membership });
 });
 
 projectsRouter.get("/:projectId", async (req: AuthRequest, res) => {
   const projectId = String(req.params.projectId);
   const membership = await requireProjectMember(projectId, req.user!.id);
   const project = await prisma.project.findUnique({ where: { id: projectId }, include: { members: memberInclude } });
-  res.json({ project, membership });
+  res.json({ project: project ? await withProjectKey(project) : project, membership });
 });
 
 projectsRouter.patch("/:projectId", async (req: AuthRequest, res) => {
