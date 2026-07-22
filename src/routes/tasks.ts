@@ -23,7 +23,13 @@ const taskInput = z.object({
   estimatedMinutes: z.number().int().positive().nullable().optional(),
   position: z.number().default(0),
 });
-const taskInclude = { assignee: { select: { id: true, displayName: true, username: true } }, _count: { select: { comments: true, children: true, attachments: true } } } as const;
+const taskInclude = {
+  assignee: { select: { id: true, displayName: true, username: true } },
+  watchers: { select: { userId: true, user: { select: { id: true, displayName: true, username: true } } } },
+  blocking: { include: { blocked: { select: { id: true, key: true, title: true } } } },
+  blockedBy: { include: { blocker: { select: { id: true, key: true, title: true } } } },
+  _count: { select: { comments: true, children: true, attachments: true, watchers: true } }
+} as const;
 const projectKeyCandidate = () => `ORB-${randomBytes(5).toString("base64url").replace(/[^A-Z0-9]/gi, "").slice(0, 6).toUpperCase().padEnd(6, "0")}`;
 const encodeTaskNumber = (number: number) => {
   const encoded = number.toString(36).toUpperCase();
@@ -100,6 +106,40 @@ tasksRouter.patch("/:taskId", async (req: AuthRequest, res) => {
   await logActivity({ projectId: existing.projectId, taskId: task.id, userId: req.user!.id, action: "TASK_UPDATED", oldValue: existing, newValue: task });
   req.app.get("io").to(`project:${existing.projectId}`).emit("task:updated", task);
   res.json({ task });
+});
+
+tasksRouter.post("/:taskId/dependencies", async (req: AuthRequest, res) => {
+  const { blockerId } = z.object({ blockerId: z.string() }).parse(req.body);
+  const [blocked, blocker] = await Promise.all([
+    prisma.task.findUniqueOrThrow({ where: { id: req.params.taskId } }),
+    prisma.task.findUniqueOrThrow({ where: { id: blockerId } })
+  ]);
+  await requireProjectEditor(blocked.projectId, req.user!.id);
+  if (blocked.id === blocker.id || blocked.projectId !== blocker.projectId) return res.status(400).json({ error: "Dependency must be another task in the same project" });
+  const dependency = await prisma.taskDependency.upsert({ where: { blockerId_blockedId: { blockerId, blockedId: blocked.id } }, update: {}, create: { blockerId, blockedId: blocked.id } });
+  await logActivity({ projectId: blocked.projectId, taskId: blocked.id, userId: req.user!.id, action: "TASK_DEPENDENCY_ADDED", newValue: { blockerId, blockerKey: blocker.key } });
+  req.app.get("io").to(`project:${blocked.projectId}`).emit("task:dependency", { taskId: blocked.id, blockerId, action: "added" });
+  res.status(201).json({ dependency });
+});
+
+tasksRouter.delete("/:taskId/dependencies/:blockerId", async (req: AuthRequest, res) => {
+  const task = await prisma.task.findUniqueOrThrow({ where: { id: req.params.taskId } });
+  await requireProjectEditor(task.projectId, req.user!.id);
+  await prisma.taskDependency.deleteMany({ where: { blockerId: req.params.blockerId, blockedId: task.id } });
+  await logActivity({ projectId: task.projectId, taskId: task.id, userId: req.user!.id, action: "TASK_DEPENDENCY_REMOVED", oldValue: { blockerId: req.params.blockerId } });
+  req.app.get("io").to(`project:${task.projectId}`).emit("task:dependency", { taskId: task.id, blockerId: req.params.blockerId, action: "removed" });
+  res.json({ ok: true });
+});
+
+tasksRouter.post("/:taskId/watch", async (req: AuthRequest, res) => {
+  const task = await prisma.task.findUniqueOrThrow({ where: { id: req.params.taskId } });
+  await requireProjectMember(task.projectId, req.user!.id);
+  const key = { taskId_userId: { taskId: task.id, userId: req.user!.id } };
+  const existing = await prisma.taskWatcher.findUnique({ where: key });
+  if (existing) await prisma.taskWatcher.delete({ where: key });
+  else await prisma.taskWatcher.create({ data: { taskId: task.id, userId: req.user!.id } });
+  req.app.get("io").to(`project:${task.projectId}`).emit("task:watcher", { taskId: task.id, userId: req.user!.id, watching: !existing });
+  res.json({ watching: !existing });
 });
 
 tasksRouter.delete("/:taskId", async (req: AuthRequest, res) => {
