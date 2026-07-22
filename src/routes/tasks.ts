@@ -103,6 +103,8 @@ tasksRouter.patch("/:taskId", async (req: AuthRequest, res) => {
     if (!member) return res.status(400).json({ error: "Assignee must be an active project member" });
   }
   const task = await prisma.task.update({ where: { id: existing.id }, data: { ...patch, updatedById: req.user!.id } });
+  const watchers = await prisma.taskWatcher.findMany({ where: { taskId: task.id, userId: { not: req.user!.id } }, select: { userId: true } });
+  if (watchers.length) await prisma.notification.createMany({ data: watchers.map(watcher => ({ userId: watcher.userId, projectId: existing.projectId, taskId: task.id, type: "STATUS_CHANGED" as const, title: `${task.key || "Task"} updated`, body: patch.status ? `Status changed to ${patch.status.replaceAll("_", " ").toLowerCase()}` : `${task.title} was updated` })) });
   await logActivity({ projectId: existing.projectId, taskId: task.id, userId: req.user!.id, action: "TASK_UPDATED", oldValue: existing, newValue: task });
   req.app.get("io").to(`project:${existing.projectId}`).emit("task:updated", task);
   res.json({ task });
